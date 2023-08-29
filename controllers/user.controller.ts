@@ -12,7 +12,7 @@ import { validationResult } from "express-validator";
 
 const users = new User();
 
-export const getUsers = async (req: Request, res: Response) => {
+export const getAllUsers = async (req: Request, res: Response) => {
   const page = req.query.page ? (req.query.page as string) : "0";
   const limit = req.query.limit ? (req.query.limit as string) : "10";
   const username = req.query.username ? (req.query.username as string) : "";
