@@ -1,10 +1,12 @@
 import type { IUser } from "../schemas/user.schema";
 import type { MysqlError } from "mysql";
+import { User } from "../models/user.model";
 import bcrypt from "bcrypt";
 import db from "./db";
 import passportLocal from "passport-local";
 
 const localStrategy = passportLocal.Strategy;
+const users = new User()
 
 // Authentication middleware || связующий компонент аутентификации
 module.exports = function (passport: any) {
@@ -45,13 +47,18 @@ module.exports = function (passport: any) {
   });
 
   // User deserializing || предоставление пользователей
-  passport.deserializeUser(function (id: number, done: any) {
-    const getByIdQuery = `SELECT * FROM ea_users INNER JOIN ea_bank_accounts ON ea_users.id=ea_bank_accounts.user_id WHERE ea_users.id='${id}'`;
-    db.query(getByIdQuery, (err: MysqlError | null, result: IUser) => {
-      if (err) throw err;
+  passport.deserializeUser(async function (id: string, done: any) {
+    const isUserHasAccounts = await users.isUserHasAccounts(id);
 
-      const user = result;
-      done(null, user);
-    });
+    let result;
+    
+    if (isUserHasAccounts) {
+      result = await users.getByIdWithMerge(id);
+    } else {
+      result = await users.getById(id);
+    }
+
+    const user = result;
+    done(null, user);
   });
 };
