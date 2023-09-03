@@ -31,6 +31,7 @@ const validation_1 = require("../helpers/validation");
 const express_1 = __importDefault(require("express"));
 const multer_1 = require("../config/multer");
 const router = express_1.default.Router();
+router.get("/get-user-data", UserController.getUser);
 router.get("/get", UserController.getUsers);
 router.get("/get/:id", UserController.getUserById);
 router.post("/add", UserController.addUser);
