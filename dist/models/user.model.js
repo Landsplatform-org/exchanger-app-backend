@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.User = void 0;
 const db_1 = __importDefault(require("../config/db"));
+const mergeBankAccounts_1 = require("../utils/mergeBankAccounts");
 class User {
     getAll(limit, page, username) {
         return new Promise((resolve, reject) => {
@@ -17,15 +18,41 @@ class User {
             });
         });
     }
-    getById(id) {
+    isUserHasAccounts(id) {
         return new Promise((resolve, reject) => {
-            const sql = `SELECT * FROM ea_users INNER JOIN ea_bank_accounts ON ea_users.id=ea_bank_accounts.user_id WHERE ea_users.id='${id}'`;
+            const sql = `SELECT * FROM ea_bank_accounts WHERE user_id='${id}'`;
             db_1.default.query(sql, (err, result) => {
                 if (err)
                     reject(err);
-                if (!result)
-                    reject("User was not found");
-                resolve(result);
+                if (!result.length)
+                    resolve(false);
+                resolve(true);
+            });
+        });
+    }
+    getById(id) {
+        return new Promise((resolve, reject) => {
+            const sql = `SELECT u.id, u.username, u.email, u.password, u.firstname, u.lastname, u.phone, u.avatar, u.is_verified
+                   FROM ea_users u WHERE u.id='${id}'`;
+            db_1.default.query(sql, (err, result) => {
+                if (err)
+                    reject(err);
+                if (!result.length)
+                    reject("Пользователь не найден");
+                resolve(result[0]);
+            });
+        });
+    }
+    getByIdWithMerge(id) {
+        return new Promise((resolve, reject) => {
+            const sql = `SELECT u.id, u.username, u.email, u.password, u.firstname, u.lastname, u.phone, u.avatar, u.is_verified, b.account 
+                   FROM ea_users u JOIN ea_bank_accounts b ON u.id=b.user_id WHERE u.id='${id}'`;
+            db_1.default.query(sql, (err, result) => {
+                if (err)
+                    reject(err);
+                if (!result.length)
+                    reject("Пользователь не найден");
+                resolve((0, mergeBankAccounts_1.mergeBankAccounts)(result));
             });
         });
     }
@@ -36,14 +63,14 @@ class User {
                 if (err)
                     reject(err);
                 if (!result[0])
-                    reject("User was not found");
+                    reject("Пользователь не найден");
                 resolve(result[0]);
             });
         });
     }
     add(user, password) {
         return new Promise((resolve, reject) => {
-            const { ref_id, username, firstname, lastname, email, ref_fee_type, ref_fee, role_id, status_id } = user;
+            const { ref_id, username, firstname, lastname, email, ref_fee_type, ref_fee, role_id, status_id, } = user;
             const sql = `
         INSERT INTO ea_users (ref_id, username, firstname, lastname, email, password, ref_fee_type, ref_fee, role_id, status_id) 
         VALUES ('${ref_id}', '${username}', '${firstname}', '${lastname}', '${email}', '${password}', '${ref_fee_type}', '${ref_fee}', '${role_id}', '${status_id}')

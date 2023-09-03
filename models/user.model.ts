@@ -1,8 +1,10 @@
+import { ResultSetHeader, RowDataPacket } from "mysql2";
+
 import { IRegisterForm } from "../schemas/user_register.schema";
 import { IUser } from "../schemas/user.schema";
 import { MysqlError } from "mysql";
-import { ResultSetHeader } from "mysql2";
 import db from "../config/db";
+import { mergeBankAccounts } from "../utils/mergeBankAccounts";
 
 export class User {
   getAll(limit: string, page: string, username: string): Promise<IUser[]> {
@@ -17,14 +19,41 @@ export class User {
     });
   }
 
+  isUserHasAccounts(id: string): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      const sql = `SELECT * FROM ea_bank_accounts WHERE user_id='${id}'`;
+
+      db.query(sql, (err: MysqlError | null, result: RowDataPacket[]) => {
+        if(err) reject(err)
+        if(!result.length) resolve(false)
+        resolve(true);
+      })
+    })
+  }
+
   getById(id: string): Promise<IUser> {
     return new Promise((resolve, reject) => {
-      const sql = `SELECT * FROM ea_users INNER JOIN ea_bank_accounts ON ea_users.id=ea_bank_accounts.user_id WHERE ea_users.id='${id}'`;
-
-      db.query(sql, (err: MysqlError | null, result: IUser) => {
+      const sql = `SELECT u.id, u.username, u.email, u.password, u.firstname, u.lastname, u.phone, u.avatar, u.is_verified
+                   FROM ea_users u WHERE u.id='${id}'`;
+      
+      db.query(sql, (err: MysqlError | null, result: IUser[]) => {
         if (err) reject(err);
-        if (!result) reject("User was not found");
-        resolve(result);
+        if (!result.length) reject("Пользователь не найден");
+        resolve(result[0]) 
+      })
+    })
+  }
+
+  getByIdWithMerge(id: string): Promise<IUser> {
+    return new Promise((resolve, reject) => {
+      const sql = `SELECT u.id, u.username, u.email, u.password, u.firstname, u.lastname, u.phone, u.avatar, u.is_verified, b.account 
+                   FROM ea_users u JOIN ea_bank_accounts b ON u.id=b.user_id WHERE u.id='${id}'`;
+
+      db.query(sql, (err: MysqlError | null, result: IUser[]) => {
+
+        if (err) reject(err);
+        if (!result.length) reject("Пользователь не найден");
+        resolve(mergeBankAccounts(result)) 
       });
     });
   }
@@ -35,7 +64,7 @@ export class User {
 
       db.query(sql, (err: MysqlError | null, result: IUser[]) => {
         if (err) reject(err);
-        if (!result[0]) reject("User was not found");
+        if (!result[0]) reject("Пользователь не найден");
         resolve(result[0]);
       });
     });
@@ -43,7 +72,17 @@ export class User {
 
   add(user: IUser, password: string) {
     return new Promise((resolve, reject) => {
-      const { ref_id, username, firstname, lastname, email, ref_fee_type, ref_fee, role_id, status_id } = user;
+      const {
+        ref_id,
+        username,
+        firstname,
+        lastname,
+        email,
+        ref_fee_type,
+        ref_fee,
+        role_id,
+        status_id,
+      } = user;
 
       const sql = `
         INSERT INTO ea_users (ref_id, username, firstname, lastname, email, password, ref_fee_type, ref_fee, role_id, status_id) 
@@ -221,10 +260,11 @@ export class User {
 
       db.query(sql, (err: MysqlError | null, result: IUser[]) => {
         if (err) reject(err);
-        if (result[0]) reject("Пользователь с таким имененем пользователя уже существует");
+        if (result[0])
+          reject("Пользователь с таким имененем пользователя уже существует");
         resolve("Это имя пользователя свободно");
-      })
-    })
+      });
+    });
 
     const checkEmail = new Promise((resolve, reject) => {
       const sql = `SELECT * FROM ea_users WHERE email='${email}'`;
@@ -234,7 +274,7 @@ export class User {
         if (result[0]) reject("Пользователь с такой почтой уже существует");
         resolve("Эта почта доступна для регистрации");
       });
-    })
+    });
     return Promise.all([checkUsername, checkEmail]);
   }
 

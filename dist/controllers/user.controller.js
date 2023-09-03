@@ -46,8 +46,15 @@ const getUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 exports.getUsers = getUsers;
 const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const id = req.params.id;
+    let result;
     try {
-        const result = yield users.getById(id);
+        const isUserHasAccounts = yield users.isUserHasAccounts(id);
+        if (isUserHasAccounts) {
+            result = yield users.getByIdWithMerge(id);
+        }
+        else {
+            result = yield users.getById(id);
+        }
         return res.status(200).send({
             status: 200,
             data: result,

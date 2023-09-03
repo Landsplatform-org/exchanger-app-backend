@@ -39,8 +39,17 @@ export const getUsers = async (req: Request, res: Response) => {
 export const getUserById = async (req: Request, res: Response) => {
   const id = req.params.id;
 
+  let result;
+
   try {
-    const result = await users.getById(id);
+    const isUserHasAccounts = await users.isUserHasAccounts(id);
+    
+    if (isUserHasAccounts) {
+      result = await users.getByIdWithMerge(id);
+    } else {
+      result = await users.getById(id);
+    }
+
     return res.status(200).send({
       status: 200,
       data: result,
