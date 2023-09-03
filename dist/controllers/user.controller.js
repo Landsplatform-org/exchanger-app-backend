@@ -12,15 +12,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.setAvatar = exports.changeEmail = exports.checkEMail = exports.changePassword = exports.resetPassword = exports.forgetPassword = exports.verifyMail = exports.loginUser = exports.registerUser = exports.deleteUser = exports.updateUser = exports.addUser = exports.getUserById = exports.getUsers = void 0;
+exports.getUser = exports.setAvatar = exports.changeEmail = exports.checkEMail = exports.changePassword = exports.resetPassword = exports.forgetPassword = exports.verifyMail = exports.loginUser = exports.registerUser = exports.deleteUser = exports.updateUser = exports.addUser = exports.getUserById = exports.getUsers = void 0;
 const user_model_1 = require("../models/user.model");
 const bcrypt_1 = __importDefault(require("bcrypt"));
+const dotenv_1 = __importDefault(require("dotenv"));
 const picode_generator_1 = require("../utils/picode-generator");
 const passport_1 = __importDefault(require("passport"));
 const path_1 = __importDefault(require("path"));
 const randomstring_1 = __importDefault(require("randomstring"));
 const email_1 = require("../helpers/email");
 const express_validator_1 = require("express-validator");
+dotenv_1.default.config();
 const users = new user_model_1.User();
 const getUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const page = req.query.page ? req.query.page : "0";
@@ -121,7 +123,7 @@ const deleteUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
 });
 exports.deleteUser = deleteUser;
 const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const bodyToRegister = req.body;
+    const { username, email, password } = req.body;
     const errors = (0, express_validator_1.validationResult)(req);
     if (!errors.isEmpty())
         return res.status(400).send({
@@ -130,25 +132,25 @@ const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     const mailSubject = "Mail Verification";
     const randomToken = randomstring_1.default.generate();
     try {
-        const hashedPassword = bcrypt_1.default.hashSync(bodyToRegister.password, 10);
-        const result = yield users.register(bodyToRegister, hashedPassword);
+        const hashedPassword = bcrypt_1.default.hashSync(password, 10);
+        const result = yield users.register({ username, email, password }, hashedPassword);
         const content = "<p>Hello " +
-            bodyToRegister.username +
+            username +
             ", please <a href=" +
             process.env.BASE_WEB_URL +
             "mail-verification/?token=" +
             randomToken +
             "&email=" +
-            bodyToRegister.email +
+            email +
             "> Verify" +
             " " +
             "</a>your mail</p>";
-        (0, email_1.sendMail)(bodyToRegister.email, mailSubject, content);
-        yield users.updateToken(randomToken, bodyToRegister.email);
+        (0, email_1.sendMail)(email, mailSubject, content);
+        yield users.updateToken(randomToken, email);
         return res.status(201).send({
             status: 201,
             data: result,
-            message: "Successful",
+            message: `Вы были успешно зарегистрированы! Вам было отправлено письмо на почту ${email} для ее подтверждения`,
         });
     }
     catch (error) {
@@ -160,25 +162,28 @@ const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 });
 exports.registerUser = registerUser;
 const loginUser = (req, res) => {
-    passport_1.default.authenticate("local", (err, user) => {
-        if (err)
+    passport_1.default.authenticate("local", function (error, user) {
+        if (error)
             return res.status(401).send({
                 status: 401,
-                message: err,
+                message: error,
             });
-        if (!user)
+        if (!user) {
             res.status(400).send({
                 status: 400,
-                message: "Username or password is invalid",
+                message: "Неверные имя пользователя или пароль",
             });
-        req.login(user, (err) => {
-            if (err)
-                throw err;
-            res.status(200).send({
-                status: 200,
-                message: "User was logged in successfully",
+        }
+        else {
+            req.logIn(user, (error) => {
+                if (error)
+                    throw error;
+                res.status(200).send({
+                    status: 200,
+                    message: "Вход успешно выполнен",
+                });
             });
-        });
+        }
     })(req, res);
 };
 exports.loginUser = loginUser;
@@ -263,9 +268,9 @@ const changePassword = (req, res) => __awaiter(void 0, void 0, void 0, function*
     try {
         const result = yield users.getOldPassword(id);
         const oldPasswordFromDB = result;
-        bcrypt_1.default.compare(oldPassword, oldPasswordFromDB, (err, response) => __awaiter(void 0, void 0, void 0, function* () {
-            if (err)
-                throw err;
+        bcrypt_1.default.compare(oldPassword, oldPasswordFromDB, (error, response) => __awaiter(void 0, void 0, void 0, function* () {
+            if (error)
+                throw error;
             if (!response)
                 return res.status(400).send({
                     status: 400,
@@ -360,3 +365,7 @@ const setAvatar = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.setAvatar = setAvatar;
+const getUser = (req, res) => {
+    res.send(req.user);
+};
+exports.getUser = getUser;

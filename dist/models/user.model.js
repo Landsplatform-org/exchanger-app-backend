@@ -19,19 +19,19 @@ class User {
     }
     getById(id) {
         return new Promise((resolve, reject) => {
-            const sql = `SELECT * FROM ea_users WHERE id=${id}`;
+            const sql = `SELECT * FROM ea_users INNER JOIN ea_bank_accounts ON ea_users.id=ea_bank_accounts.user_id WHERE ea_users.id='${id}'`;
             db_1.default.query(sql, (err, result) => {
                 if (err)
                     reject(err);
-                if (!result[0])
+                if (!result)
                     reject("User was not found");
-                resolve(result[0]);
+                resolve(result);
             });
         });
     }
     getByEmail(email) {
         return new Promise((resolve, reject) => {
-            const sql = `SELECT * FROM ea_users WHERE id=${email}`;
+            const sql = `SELECT * FROM ea_users WHERE id='${email}'`;
             db_1.default.query(sql, (err, result) => {
                 if (err)
                     reject(err);
@@ -46,7 +46,7 @@ class User {
             const { ref_id, username, firstname, lastname, email, ref_fee_type, ref_fee, role_id, status_id } = user;
             const sql = `
         INSERT INTO ea_users (ref_id, username, firstname, lastname, email, password, ref_fee_type, ref_fee, role_id, status_id) 
-        VALUES (${ref_id}, ${username}, ${firstname}, ${lastname}, ${email}, ${password}, ${ref_fee_type}, ${ref_fee}, ${role_id}, ${status_id})
+        VALUES ('${ref_id}', '${username}', '${firstname}', '${lastname}', '${email}', '${password}', '${ref_fee_type}', '${ref_fee}', '${role_id}', '${status_id}')
       `;
             db_1.default.query(sql, (err) => {
                 if (err)
@@ -59,7 +59,7 @@ class User {
         return new Promise((resolve, reject) => {
             this.find(id)
                 .then(() => {
-                const sql = `UPDATE ea_users SET ${userBody} WHERE id=${id}`;
+                const sql = `UPDATE ea_users SET '${userBody}' WHERE id='${id}'`;
                 db_1.default.query(sql, (err, result) => {
                     if (err)
                         reject(err);
@@ -73,7 +73,7 @@ class User {
         return new Promise((resolve, reject) => {
             this.find(id)
                 .then(() => {
-                const sql = `DELETE FROM ea_users WHERE id=${id}`;
+                const sql = `DELETE FROM ea_users WHERE id='${id}'`;
                 db_1.default.query(sql, (err) => {
                     if (err)
                         reject(err);
@@ -86,13 +86,13 @@ class User {
     register(user, password) {
         return new Promise((resolve, reject) => {
             const { username, email } = user;
-            this.isEmailExist(email)
+            this.isUserExist(username, email)
                 .then(() => {
-                const sql = `INSERT INTO ea_users (username, password, email) VALUES (${username}, ${password}, ${email})`;
+                const sql = `INSERT INTO ea_users (username, password, email) VALUES ('${username}', '${password}', '${email}')`;
                 db_1.default.query(sql, (err) => {
                     if (err)
                         reject(err);
-                    resolve("User was registered successfully");
+                    resolve("Пользователь был успешно зарегистрирован!");
                 });
             })
                 .catch((error) => reject(error));
@@ -100,7 +100,7 @@ class User {
     }
     updateToken(token, email) {
         return new Promise((resolve, reject) => {
-            const sql = `UPDATE ea_users SET token=${token} WHERE email=${email}`;
+            const sql = `UPDATE ea_users SET token='${token}' WHERE email='${email}'`;
             db_1.default.query(sql, (err) => {
                 if (err)
                     reject(err);
@@ -112,7 +112,7 @@ class User {
         return new Promise((resolve, reject) => {
             this.getToken(token)
                 .then((id) => {
-                const sql = `UPDATE ea_users SET token=NULL, is_verified=1 WHERE id=${id}`;
+                const sql = `UPDATE ea_users SET token=NULL, is_verified=1 WHERE id='${id}'`;
                 db_1.default.query(sql, () => {
                     resolve("Email was verified");
                 });
@@ -122,7 +122,7 @@ class User {
     }
     setPIN(pin, email) {
         return new Promise((resolve, reject) => {
-            const sql = `UPDATE ea_users SET pin=${pin} WHERE email=${email}`;
+            const sql = `UPDATE ea_users SET pin='${pin}' WHERE email='${email}'`;
             db_1.default.query(sql, (err) => {
                 if (err)
                     reject(err);
@@ -142,7 +142,7 @@ class User {
     }
     changePassword(id, password) {
         return new Promise((resolve, reject) => {
-            const sql = `UPDATE ea_users SET password=${password} WHERE id=${id}`;
+            const sql = `UPDATE ea_users SET password='${password}' WHERE id='${id}'`;
             db_1.default.query(sql, (err) => {
                 if (err)
                     reject(err);
@@ -152,7 +152,7 @@ class User {
     }
     checkEmail(email) {
         return new Promise((resolve, reject) => {
-            const sql = `SELECT * FROM ea_users WHERE email=${email}`;
+            const sql = `SELECT * FROM ea_users WHERE email='${email}'`;
             db_1.default.query(sql, (err, result) => {
                 if (err)
                     reject(err);
@@ -176,7 +176,7 @@ class User {
         return new Promise((resolve, reject) => {
             this.getToken(token)
                 .then((id) => {
-                const sql = `UPDATE ea_users SET token=NULL, password=${defaultPassword} WHERE id=${id}`;
+                const sql = `UPDATE ea_users SET token=NULL, password='${defaultPassword}' WHERE id='${id}'`;
                 db_1.default.query(sql, (err) => {
                     if (err)
                         reject(err);
@@ -190,7 +190,7 @@ class User {
         return new Promise((resolve, reject) => {
             this.find(id)
                 .then(() => {
-                const sql = `UPDATE ea_users SET avatar=${avatar} WHERE id=${id}`;
+                const sql = `UPDATE ea_users SET avatar='${avatar}' WHERE id='${id}'`;
                 db_1.default.query(sql, (err) => {
                     if (err)
                         reject(err);
@@ -200,21 +200,29 @@ class User {
                 .catch((error) => reject(error));
         });
     }
-    isEmailExist(email) {
+    isUserExist(username, email) {
         return new Promise((resolve, reject) => {
-            const sql = `SELECT * FROM ea_users WHERE email=${email}`;
-            db_1.default.query(sql, (err, result) => {
+            const findUsername = `SELECT * FROM ea_users WHERE username='${username}'`;
+            const findEmail = `SELECT * FROM ea_users WHERE email='${email}'`;
+            db_1.default.query(findUsername, (err, result) => {
                 if (err)
                     reject(err);
                 if (result[0])
-                    reject("User already exist");
-                resolve("This email is available");
+                    reject("Пользователь с таким имененем пользователя уже существует");
+                resolve("Это имя пользователя свободно");
+            });
+            db_1.default.query(findEmail, (err, result) => {
+                if (err)
+                    reject(err);
+                if (result[0])
+                    reject("Пользователь с такой почтой уже существует");
+                resolve("Эта почта доступна для регистрации");
             });
         });
     }
     getToken(token) {
         return new Promise((resolve, reject) => {
-            const sql = `SELECT * FROM ea_users WHERE token=${token}`;
+            const sql = `SELECT * FROM ea_users WHERE token='${token}'`;
             db_1.default.query(sql, (err, result) => {
                 if (err)
                     reject(err);
@@ -226,7 +234,7 @@ class User {
     }
     find(id) {
         return new Promise((resolve, reject) => {
-            const sql = `SELECT * FROM ea_users WHERE id=${id}`;
+            const sql = `SELECT * FROM ea_users WHERE id='${id}'`;
             db_1.default.query(sql, (err, result) => {
                 if (err)
                     reject(err);

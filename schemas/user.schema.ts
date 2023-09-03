@@ -1,4 +1,6 @@
-export interface IUser {
+import { IBankAccount } from "./bank_account.schema";
+
+export interface IUser extends IBankAccount {
   id?: number;
   username: string;
   email: string;

@@ -1,3 +1,4 @@
+import { IRegisterForm } from "../schemas/user_register.schema";
 import { IUser } from "../schemas/user.schema";
 import { MysqlError } from "mysql";
 import { ResultSetHeader } from "mysql2";
@@ -18,19 +19,19 @@ export class User {
 
   getById(id: string): Promise<IUser> {
     return new Promise((resolve, reject) => {
-      const sql = `SELECT * FROM ea_users WHERE id=${id}`;
+      const sql = `SELECT * FROM ea_users INNER JOIN ea_bank_accounts ON ea_users.id=ea_bank_accounts.user_id WHERE ea_users.id='${id}'`;
 
-      db.query(sql, (err: MysqlError | null, result: IUser[]) => {
+      db.query(sql, (err: MysqlError | null, result: IUser) => {
         if (err) reject(err);
-        if (!result[0]) reject("User was not found");
-        resolve(result[0]);
+        if (!result) reject("User was not found");
+        resolve(result);
       });
     });
   }
 
   getByEmail(email: string): Promise<IUser> {
     return new Promise((resolve, reject) => {
-      const sql = `SELECT * FROM ea_users WHERE id=${email}`;
+      const sql = `SELECT * FROM ea_users WHERE id='${email}'`;
 
       db.query(sql, (err: MysqlError | null, result: IUser[]) => {
         if (err) reject(err);
@@ -46,7 +47,7 @@ export class User {
 
       const sql = `
         INSERT INTO ea_users (ref_id, username, firstname, lastname, email, password, ref_fee_type, ref_fee, role_id, status_id) 
-        VALUES (${ref_id}, ${username}, ${firstname}, ${lastname}, ${email}, ${password}, ${ref_fee_type}, ${ref_fee}, ${role_id}, ${status_id})
+        VALUES ('${ref_id}', '${username}', '${firstname}', '${lastname}', '${email}', '${password}', '${ref_fee_type}', '${ref_fee}', '${role_id}', '${status_id}')
       `;
 
       db.query(sql, (err: MysqlError | null) => {
@@ -60,7 +61,7 @@ export class User {
     return new Promise((resolve, reject) => {
       this.find(id)
         .then(() => {
-          const sql = `UPDATE ea_users SET ${userBody} WHERE id=${id}`;
+          const sql = `UPDATE ea_users SET '${userBody}' WHERE id='${id}'`;
 
           db.query(sql, (err: MysqlError | null, result: ResultSetHeader) => {
             if (err) reject(err);
@@ -75,7 +76,7 @@ export class User {
     return new Promise((resolve, reject) => {
       this.find(id)
         .then(() => {
-          const sql = `DELETE FROM ea_users WHERE id=${id}`;
+          const sql = `DELETE FROM ea_users WHERE id='${id}'`;
 
           db.query(sql, (err: MysqlError | null) => {
             if (err) reject(err);
@@ -86,17 +87,17 @@ export class User {
     });
   }
 
-  register(user: IUser, password: string) {
+  register(user: IRegisterForm, password: string) {
     return new Promise((resolve, reject) => {
       const { username, email } = user;
 
-      this.isEmailExist(email)
+      this.isUserExist(username, email)
         .then(() => {
-          const sql = `INSERT INTO ea_users (username, password, email) VALUES (${username}, ${password}, ${email})`;
+          const sql = `INSERT INTO ea_users (username, password, email) VALUES ('${username}', '${password}', '${email}')`;
 
           db.query(sql, (err: MysqlError | null) => {
             if (err) reject(err);
-            resolve("User was registered successfully");
+            resolve("Пользователь был успешно зарегистрирован!");
           });
         })
         .catch((error) => reject(error));
@@ -105,7 +106,7 @@ export class User {
 
   updateToken(token: string, email: string) {
     return new Promise((resolve, reject) => {
-      const sql = `UPDATE ea_users SET token=${token} WHERE email=${email}`;
+      const sql = `UPDATE ea_users SET token='${token}' WHERE email='${email}'`;
 
       db.query(sql, (err: MysqlError | null) => {
         if (err) reject(err);
@@ -118,7 +119,7 @@ export class User {
     return new Promise((resolve, reject) => {
       this.getToken(token)
         .then((id) => {
-          const sql = `UPDATE ea_users SET token=NULL, is_verified=1 WHERE id=${id}`;
+          const sql = `UPDATE ea_users SET token=NULL, is_verified=1 WHERE id='${id}'`;
 
           db.query(sql, () => {
             resolve("Email was verified");
@@ -130,7 +131,7 @@ export class User {
 
   setPIN(pin: string, email: string) {
     return new Promise((resolve, reject) => {
-      const sql = `UPDATE ea_users SET pin=${pin} WHERE email=${email}`;
+      const sql = `UPDATE ea_users SET pin='${pin}' WHERE email='${email}'`;
 
       db.query(sql, (err: MysqlError | null) => {
         if (err) reject(err);
@@ -152,7 +153,7 @@ export class User {
 
   changePassword(id: string, password: string) {
     return new Promise((resolve, reject) => {
-      const sql = `UPDATE ea_users SET password=${password} WHERE id=${id}`;
+      const sql = `UPDATE ea_users SET password='${password}' WHERE id='${id}'`;
 
       db.query(sql, (err: MysqlError | null) => {
         if (err) reject(err);
@@ -163,7 +164,7 @@ export class User {
 
   checkEmail(email: string) {
     return new Promise((resolve, reject) => {
-      const sql = `SELECT * FROM ea_users WHERE email=${email}`;
+      const sql = `SELECT * FROM ea_users WHERE email='${email}'`;
 
       db.query(sql, (err: MysqlError | null, result: IUser[]) => {
         if (err) reject(err);
@@ -188,7 +189,7 @@ export class User {
     return new Promise((resolve, reject) => {
       this.getToken(token)
         .then((id) => {
-          const sql = `UPDATE ea_users SET token=NULL, password=${defaultPassword} WHERE id=${id}`;
+          const sql = `UPDATE ea_users SET token=NULL, password='${defaultPassword}' WHERE id='${id}'`;
 
           db.query(sql, (err: MysqlError | null) => {
             if (err) reject(err);
@@ -203,7 +204,7 @@ export class User {
     return new Promise((resolve, reject) => {
       this.find(id)
         .then(() => {
-          const sql = `UPDATE ea_users SET avatar=${avatar} WHERE id=${id}`;
+          const sql = `UPDATE ea_users SET avatar='${avatar}' WHERE id='${id}'`;
 
           db.query(sql, (err: MysqlError | null) => {
             if (err) reject(err);
@@ -214,21 +215,28 @@ export class User {
     });
   }
 
-  private isEmailExist(email: string) {
+  private isUserExist(username: string, email: string) {
     return new Promise((resolve, reject) => {
-      const sql = `SELECT * FROM ea_users WHERE email=${email}`;
+      const findUsername = `SELECT * FROM ea_users WHERE username='${username}'`;
+      const findEmail = `SELECT * FROM ea_users WHERE email='${email}'`;
 
-      db.query(sql, (err: MysqlError | null, result: IUser[]) => {
+      db.query(findUsername, (err: MysqlError | null, result: IUser[]) => {
         if (err) reject(err);
-        if (result[0]) reject("User already exist");
-        resolve("This email is available");
+        if (result[0]) reject("Пользователь с таким имененем пользователя уже существует");
+        resolve("Это имя пользователя свободно");
+      });
+
+      db.query(findEmail, (err: MysqlError | null, result: IUser[]) => {
+        if (err) reject(err);
+        if (result[0]) reject("Пользователь с такой почтой уже существует");
+        resolve("Эта почта доступна для регистрации");
       });
     });
   }
 
   private getToken(token: string) {
     return new Promise((resolve, reject) => {
-      const sql = `SELECT * FROM ea_users WHERE token=${token}`;
+      const sql = `SELECT * FROM ea_users WHERE token='${token}'`;
 
       db.query(sql, (err: MysqlError | null, result: IUser[]) => {
         if (err) reject(err);
@@ -240,7 +248,7 @@ export class User {
 
   private find(id: string): Promise<IUser> {
     return new Promise((resolve, reject) => {
-      const sql = `SELECT * FROM ea_users WHERE id=${id}`;
+      const sql = `SELECT * FROM ea_users WHERE id='${id}'`;
 
       db.query(sql, (err: MysqlError | null, result: IUser[]) => {
         if (err) reject(err);

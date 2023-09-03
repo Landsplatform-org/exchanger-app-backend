@@ -21,14 +21,19 @@ app.use(
 
 app.use(express.json());
 app.use(express.static("public"));
-app.use(cookieParser("keyboard cat"));
+app.use(cookieParser(process.env.COOKIE_SECRET as string));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(
   expressSession({
-    secret: "keyboard cat",
-    resave: false,
-    saveUninitialized: false,
+    secret: process.env.COOKIE_SECRET as string,
+    resave: true,
+    saveUninitialized: true,
+    cookie: { 
+      secure: false, 
+      httpOnly: false,
+      maxAge: 24 * 60 * 60 * 1000 
+    },
   })
 );
 

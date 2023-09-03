@@ -1,8 +1,10 @@
 import type { Request, Response } from "express";
 
+import { ILoginForm } from "../schemas/user_login";
 import type { IUser } from "../schemas/user.schema";
 import { User } from "../models/user.model";
 import bycrypt from "bcrypt";
+import dotenv from "dotenv";
 import { generate } from "../utils/picode-generator";
 import passport from "passport";
 import path from "path";
@@ -10,9 +12,11 @@ import randomstring from "randomstring";
 import { sendMail } from "../helpers/email";
 import { validationResult } from "express-validator";
 
+dotenv.config();
+
 const users = new User();
 
-export const getAllUsers = async (req: Request, res: Response) => {
+export const getUsers = async (req: Request, res: Response) => {
   const page = req.query.page ? (req.query.page as string) : "0";
   const limit = req.query.limit ? (req.query.limit as string) : "10";
   const username = req.query.username ? (req.query.username as string) : "";
@@ -112,7 +116,7 @@ export const deleteUser = async (req: Request, res: Response) => {
 };
 
 export const registerUser = async (req: Request, res: Response) => {
-  const bodyToRegister: IUser = req.body;
+  const { username, email, password } = req.body;
 
   const errors = validationResult(req);
 
@@ -125,29 +129,32 @@ export const registerUser = async (req: Request, res: Response) => {
   const randomToken = randomstring.generate();
 
   try {
-    const hashedPassword = bycrypt.hashSync(bodyToRegister.password, 10);
-    const result = await users.register(bodyToRegister, hashedPassword);
+    const hashedPassword = bycrypt.hashSync(password, 10);
+    const result = await users.register(
+      { username, email, password },
+      hashedPassword
+    );
 
     const content =
       "<p>Hello " +
-      bodyToRegister.username +
+      username +
       ", please <a href=" +
       process.env.BASE_WEB_URL +
       "mail-verification/?token=" +
       randomToken +
       "&email=" +
-      bodyToRegister.email +
+      email +
       "> Verify" +
       " " +
       "</a>your mail</p>";
 
-    sendMail(bodyToRegister.email, mailSubject, content);
-    await users.updateToken(randomToken, bodyToRegister.email);
+    sendMail(email, mailSubject, content);
+    await users.updateToken(randomToken, email);
 
     return res.status(201).send({
       status: 201,
       data: result,
-      message: "Successful",
+      message: `Вы были успешно зарегистрированы! Вам было отправлено письмо на почту ${email} для ее подтверждения`,
     });
   } catch (error) {
     return res.status(400).send({
@@ -158,27 +165,28 @@ export const registerUser = async (req: Request, res: Response) => {
 };
 
 export const loginUser = (req: Request, res: Response) => {
-  passport.authenticate("local", (err: any, user: IUser) => {
-    if (err)
+  passport.authenticate("local", function (error: any, user: IUser) {
+    if (error)
       return res.status(401).send({
         status: 401,
-        message: err,
+        message: error,
       });
 
-    if (!user)
+    if (!user) {
       res.status(400).send({
         status: 400,
-        message: "Username or password is invalid",
+        message: "Неверные имя пользователя или пароль",
       });
+    } else {
+      req.logIn(user, (error: any) => {
+        if (error) throw error;
 
-    req.login(user, (err: any) => {
-      if (err) throw err;
-
-      res.status(200).send({
-        status: 200,
-        message: "User was logged in successfully",
+        res.status(200).send({
+          status: 200,
+          message: "Вход успешно выполнен",
+        });
       });
-    });
+    }
   })(req, res);
 };
 
@@ -259,7 +267,7 @@ export const resetPassword = async (req: Request, res: Response) => {
     await users.resetPassword(token, defaultPassword);
     return res
       .status(200)
-      .sendFile(path.join(__dirname, "..", "views", "resetPassword.html"))
+      .sendFile(path.join(__dirname, "..", "views", "resetPassword.html"));
   } catch (error) {
     res.status(400).send({
       status: 400,
@@ -282,8 +290,8 @@ export const changePassword = async (req: Request, res: Response) => {
     bycrypt.compare(
       oldPassword,
       oldPasswordFromDB as string,
-      async (err, response) => {
-        if (err) throw err;
+      async (error, response) => {
+        if (error) throw error;
         if (!response)
           return res.status(400).send({
             status: 400,
@@ -388,3 +396,6 @@ export const setAvatar = async (req: Request, res: Response) => {
   }
 };
 
+export const getUser = (req: Request, res: Response) => {
+  res.send(req.user);
+};
