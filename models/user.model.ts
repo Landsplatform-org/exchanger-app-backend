@@ -216,22 +216,26 @@ export class User {
   }
 
   private isUserExist(username: string, email: string) {
-    return new Promise((resolve, reject) => {
-      const findUsername = `SELECT * FROM ea_users WHERE username='${username}'`;
-      const findEmail = `SELECT * FROM ea_users WHERE email='${email}'`;
+    const checkUsername = new Promise((resolve, reject) => {
+      const sql = `SELECT * FROM ea_users WHERE username='${username}'`;
 
-      db.query(findUsername, (err: MysqlError | null, result: IUser[]) => {
+      db.query(sql, (err: MysqlError | null, result: IUser[]) => {
         if (err) reject(err);
         if (result[0]) reject("Пользователь с таким имененем пользователя уже существует");
         resolve("Это имя пользователя свободно");
-      });
+      })
+    })
 
-      db.query(findEmail, (err: MysqlError | null, result: IUser[]) => {
+    const checkEmail = new Promise((resolve, reject) => {
+      const sql = `SELECT * FROM ea_users WHERE email='${email}'`;
+
+      db.query(sql, (err: MysqlError | null, result: IUser[]) => {
         if (err) reject(err);
         if (result[0]) reject("Пользователь с такой почтой уже существует");
         resolve("Эта почта доступна для регистрации");
       });
-    });
+    })
+    return Promise.all([checkUsername, checkEmail]);
   }
 
   private getToken(token: string) {
