@@ -201,17 +201,19 @@ class User {
         });
     }
     isUserExist(username, email) {
-        return new Promise((resolve, reject) => {
-            const findUsername = `SELECT * FROM ea_users WHERE username='${username}'`;
-            const findEmail = `SELECT * FROM ea_users WHERE email='${email}'`;
-            db_1.default.query(findUsername, (err, result) => {
+        const checkUsername = new Promise((resolve, reject) => {
+            const sql = `SELECT * FROM ea_users WHERE username='${username}'`;
+            db_1.default.query(sql, (err, result) => {
                 if (err)
                     reject(err);
                 if (result[0])
                     reject("Пользователь с таким имененем пользователя уже существует");
                 resolve("Это имя пользователя свободно");
             });
-            db_1.default.query(findEmail, (err, result) => {
+        });
+        const checkEmail = new Promise((resolve, reject) => {
+            const sql = `SELECT * FROM ea_users WHERE email='${email}'`;
+            db_1.default.query(sql, (err, result) => {
                 if (err)
                     reject(err);
                 if (result[0])
@@ -219,6 +221,7 @@ class User {
                 resolve("Эта почта доступна для регистрации");
             });
         });
+        return Promise.all([checkUsername, checkEmail]);
     }
     getToken(token) {
         return new Promise((resolve, reject) => {
