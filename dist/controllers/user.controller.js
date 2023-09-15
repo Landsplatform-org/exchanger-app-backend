@@ -12,18 +12,19 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUser = exports.setAvatar = exports.changeEmail = exports.checkEMail = exports.changePassword = exports.resetPassword = exports.forgetPassword = exports.verifyMail = exports.loginUser = exports.registerUser = exports.deleteUser = exports.updateUser = exports.addUser = exports.getUserById = exports.getUsers = void 0;
+exports.setAvatar = exports.changeEmail = exports.checkEMail = exports.changePassword = exports.resetPassword = exports.forgetPassword = exports.verifyMail = exports.refreshJWT = exports.authJWT = exports.registerUser = exports.deleteUser = exports.updateUser = exports.addUser = exports.getUserById = exports.getUsers = void 0;
+const generateJWT_1 = require("../utils/generateJWT");
 const user_model_1 = require("../models/user.model");
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const picode_generator_1 = require("../utils/picode-generator");
-const passport_1 = __importDefault(require("passport"));
 const path_1 = __importDefault(require("path"));
 const randomstring_1 = __importDefault(require("randomstring"));
 const email_1 = require("../helpers/email");
 const express_validator_1 = require("express-validator");
 dotenv_1.default.config();
 const users = new user_model_1.User();
+const EXPIRE_TIME = 72 * 60 * 60 * 1000;
 const getUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const page = req.query.page ? req.query.page : "0";
     const limit = req.query.limit ? req.query.limit : "10";
@@ -93,10 +94,11 @@ exports.addUser = addUser;
 const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const id = req.params.id;
     const bodyToUpdate = req.body;
-    if (!bodyToUpdate)
+    const { userToUpdate } = bodyToUpdate;
+    if (!userToUpdate)
         return;
     try {
-        const result = yield users.update(id, bodyToUpdate);
+        const result = yield users.update(id, userToUpdate);
         return res.status(200).send({
             status: 200,
             data: result,
@@ -168,45 +170,71 @@ const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
 });
 exports.registerUser = registerUser;
-const loginUser = (req, res) => {
-    passport_1.default.authenticate("local", function (error, user) {
-        if (error)
-            return res.status(401).send({
-                status: 401,
-                message: error,
-            });
-        if (!user) {
-            res.status(400).send({
-                status: 400,
-                message: "Неверные имя пользователя или пароль",
-            });
-        }
-        else {
-            req.logIn(user, (error) => {
-                if (error)
-                    throw error;
-                res.status(200).send({
+const authJWT = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { username, password } = req.body;
+    try {
+        const response = yield users.tryLogIn(username);
+        if (response) {
+            bcrypt_1.default.compare(password, response.password, (err, same) => {
+                if (!same) {
+                    return res.status(404).send({
+                        status: 404,
+                        message: "Неверное имя пользователя или пароль",
+                    });
+                }
+                return res.status(200).send({
                     status: 200,
-                    message: "Вход успешно выполнен",
+                    user: response,
+                    tokens: {
+                        access: (0, generateJWT_1.generateAccessToken)(response),
+                        refresh: (0, generateJWT_1.generateRefreshToken)(response)
+                    },
+                    expiresIn: Date.now() + EXPIRE_TIME
                 });
             });
         }
-    })(req, res);
+    }
+    catch (error) {
+        return res.status(404).send({
+            status: 404,
+            message: error,
+        });
+    }
+});
+exports.authJWT = authJWT;
+const refreshJWT = (req, res) => {
+    const user = req.user;
+    return res.status(200).send({
+        message: "Обновлены",
+        tokens: {
+            access: (0, generateJWT_1.generateAccessToken)(user),
+            refresh: (0, generateJWT_1.generateRefreshToken)(user)
+        }
+    });
 };
-exports.loginUser = loginUser;
+exports.refreshJWT = refreshJWT;
 const verifyMail = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { token, email } = req.query;
     const PIN = (0, picode_generator_1.generate)(4);
     const hashedPIN = bcrypt_1.default.hashSync(PIN, 10);
     try {
         const result = yield users.verifyMail(token);
-        const response = yield users.setPIN(hashedPIN, email);
-        return res.status(200).send({
-            status: 200,
-            data: result,
-            pin: PIN,
-            pin_message: response,
-        });
+        yield users.setPIN(hashedPIN, email);
+        return res.status(200).send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Document</title>
+      </head>
+      <body>
+        <h1>${result}</h1>
+        <h2>Ваш пин-код: ${PIN}, сохраните его для подтверждения операций!</h2>
+        <p>Можете закрыть эту страницу</p>
+      </body>
+      </html>
+    `);
     }
     catch (error) {
         return res.status(400).send({
@@ -222,7 +250,7 @@ const forgetPassword = (req, res) => __awaiter(void 0, void 0, void 0, function*
     if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
     }
-    const mailSubject = "Forget Password";
+    const mailSubject = "Забыли пароль";
     const randomToken = randomstring_1.default.generate();
     try {
         const result = yield users.getByEmail(email);
@@ -239,7 +267,7 @@ const forgetPassword = (req, res) => __awaiter(void 0, void 0, void 0, function*
         yield users.updateToken(randomToken, email);
         return res.status(201).send({
             status: 201,
-            data: "Email was sent to " + email,
+            data: "Письмо отправлено на почту " + email,
             message: "Successful",
         });
     }
@@ -361,7 +389,8 @@ const setAvatar = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         const result = yield users.setAvatar(id, file);
         res.status(200).send({
             status: 200,
-            message: result,
+            message: "Фото профиля было успешно обновлено",
+            data: result
         });
     }
     catch (error) {
@@ -372,7 +401,6 @@ const setAvatar = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.setAvatar = setAvatar;
-const getUser = (req, res) => {
-    res.send(req.user);
-};
-exports.getUser = getUser;
+// export const getUser = (req: Request, res: Response) => {
+//   res.send(req.user);
+// };

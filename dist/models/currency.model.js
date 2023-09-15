@@ -17,6 +17,18 @@ class Currency {
             });
         });
     }
+    getAllWithMerge(limit, page) {
+        return new Promise((resolve, reject) => {
+            const offset = +page * +limit;
+            const sql = `SELECT c.id, c.prefix, c.currency, c.min_amount, c.max_amount, c.reserve, c.default_send, c.default_receive, c.status, c.position, g.name, g.image 
+                   FROM ea_currencies c JOIN ea_gateways g ON c.gateway_id=g.id WHERE c.status=1 LIMIT ${limit} OFFSET ${offset}`;
+            db_1.default.query(sql, (err, result) => {
+                if (err)
+                    reject(err);
+                resolve(result);
+            });
+        });
+    }
     getById(id) {
         return new Promise((resolve, reject) => {
             const sql = `SELECT * FROM ea_currencies WHERE id=${id}`;

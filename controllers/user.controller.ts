@@ -1,12 +1,11 @@
 import type { Request, Response } from "express";
+import { generateAccessToken, generateRefreshToken } from "../utils/generateJWT";
 
-import { ILoginForm } from "../schemas/user_login";
 import type { IUser } from "../schemas/user.schema";
 import { User } from "../models/user.model";
 import bycrypt from "bcrypt";
 import dotenv from "dotenv";
 import { generate } from "../utils/picode-generator";
-import passport from "passport";
 import path from "path";
 import randomstring from "randomstring";
 import { sendMail } from "../helpers/email";
@@ -15,6 +14,8 @@ import { validationResult } from "express-validator";
 dotenv.config();
 
 const users = new User();
+
+const EXPIRE_TIME = 72 * 60 * 60 * 1000;
 
 export const getUsers = async (req: Request, res: Response) => {
   const page = req.query.page ? (req.query.page as string) : "0";
@@ -43,7 +44,7 @@ export const getUserById = async (req: Request, res: Response) => {
 
   try {
     const isUserHasAccounts = await users.isUserHasAccounts(id);
-    
+
     if (isUserHasAccounts) {
       result = await users.getByIdWithMerge(id);
     } else {
@@ -87,12 +88,13 @@ export const addUser = async (req: Request, res: Response) => {
 
 export const updateUser = async (req: Request, res: Response) => {
   const id = req.params.id;
-  const bodyToUpdate: IUser = req.body;
+  const bodyToUpdate = req.body;
+  const { userToUpdate } = bodyToUpdate;
 
-  if (!bodyToUpdate) return;
+  if (!userToUpdate) return;
 
   try {
-    const result = await users.update(id, bodyToUpdate);
+    const result = await users.update(id, userToUpdate);
     return res.status(200).send({
       status: 200,
       data: result,
@@ -173,31 +175,54 @@ export const registerUser = async (req: Request, res: Response) => {
   }
 };
 
-export const loginUser = (req: Request, res: Response) => {
-  passport.authenticate("local", function (error: any, user: IUser) {
-    if (error)
-      return res.status(401).send({
-        status: 401,
-        message: error,
-      });
+export const authJWT = async (req: Request, res: Response) => {
+  const { username, password } = req.body;
 
-    if (!user) {
-      res.status(400).send({
-        status: 400,
-        message: "Неверные имя пользователя или пароль",
-      });
-    } else {
-      req.logIn(user, (error: any) => {
-        if (error) throw error;
-
-        res.status(200).send({
-          status: 200,
-          message: "Вход успешно выполнен",
-        });
-      });
+  try {
+    const response = await users.tryLogIn(username);
+    if (response) {
+      bycrypt.compare(
+        password,
+        response.password,
+        (err: Error | undefined, same: boolean) => {
+          if (!same) {
+            return res.status(404).send({
+              status: 404,
+              message: "Неверное имя пользователя или пароль",
+            });
+          }
+          
+          return res.status(200).send({
+            status: 200,
+            user: response,
+            tokens: {
+              access: generateAccessToken(response),
+              refresh: generateRefreshToken(response)
+            },
+            expiresIn: Date.now() + EXPIRE_TIME
+          });
+        }
+      );
     }
-  })(req, res);
+  } catch (error) {
+    return res.status(404).send({
+      status: 404,
+      message: error,
+    });
+  }
 };
+
+export const refreshJWT = (req: Request, res: Response) => {
+  const user = req.user
+  
+  return res.status(200).send({
+    message: "Обновлены",
+    tokens: {
+      access: generateAccessToken(user),
+      refresh: generateRefreshToken(user)
+    }
+  })
+}
 
 export const verifyMail = async (req: Request, res: Response) => {
   const { token, email } = req.query;
@@ -207,13 +232,23 @@ export const verifyMail = async (req: Request, res: Response) => {
 
   try {
     const result = await users.verifyMail(token as string);
-    const response = await users.setPIN(hashedPIN, email as string);
-    return res.status(200).send({
-      status: 200,
-      data: result,
-      pin: PIN,
-      pin_message: response,
-    });
+    await users.setPIN(hashedPIN, email as string);
+
+    return res.status(200).send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Document</title>
+      </head>
+      <body>
+        <h1>${result}</h1>
+        <h2>Ваш пин-код: ${PIN}, сохраните его для подтверждения операций!</h2>
+        <p>Можете закрыть эту страницу</p>
+      </body>
+      </html>
+    `);
   } catch (error) {
     return res.status(400).send({
       status: 400,
@@ -231,7 +266,7 @@ export const forgetPassword = async (req: Request, res: Response) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const mailSubject = "Forget Password";
+  const mailSubject = "Забыли пароль";
   const randomToken = randomstring.generate();
 
   try {
@@ -253,7 +288,7 @@ export const forgetPassword = async (req: Request, res: Response) => {
 
     return res.status(201).send({
       status: 201,
-      data: "Email was sent to " + email,
+      data: "Письмо отправлено на почту " + email,
       message: "Successful",
     });
   } catch (error) {
@@ -395,7 +430,8 @@ export const setAvatar = async (req: Request, res: Response) => {
     const result = await users.setAvatar(id, file);
     res.status(200).send({
       status: 200,
-      message: result,
+      message: "Фото профиля было успешно обновлено",
+      data: result
     });
   } catch (error) {
     res.status(400).send({
@@ -405,6 +441,6 @@ export const setAvatar = async (req: Request, res: Response) => {
   }
 };
 
-export const getUser = (req: Request, res: Response) => {
-  res.send(req.user);
-};
+// export const getUser = (req: Request, res: Response) => {
+//   res.send(req.user);
+// };

@@ -27,11 +27,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const ExchangeController = __importStar(require("../controllers/exchange.controller"));
+const authToken_1 = require("../middlewares/authToken");
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
-router.get("/get", ExchangeController.getExchanges);
-router.get("/get/:id", ExchangeController.getExchangeById);
-router.post("/add", ExchangeController.addExchange);
-router.put("/edit/:id", ExchangeController.updateExchange);
-router.delete("/delete/:id", ExchangeController.deleteExchange);
+router.get("/get", authToken_1.authenticateToken, ExchangeController.getExchanges);
+router.get("/get/:id", authToken_1.authenticateToken, ExchangeController.getExchangeById);
+router.post("/add", authToken_1.authenticateToken, ExchangeController.addExchange);
+router.put("/edit/:id", authToken_1.authenticateToken, ExchangeController.updateExchange);
+router.delete("/delete/:id", authToken_1.authenticateToken, ExchangeController.deleteExchange);
 exports.default = router;
