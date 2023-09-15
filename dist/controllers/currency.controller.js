@@ -16,7 +16,7 @@ const getCurrencies = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     const page = req.query.page ? req.query.page : "0";
     const limit = req.query.limit ? req.query.limit : "10";
     try {
-        const result = yield currencies.getAll(limit, page);
+        const result = yield currencies.getAllWithMerge(limit, page);
         return res.status(200).send({
             status: 200,
             data: result,

@@ -1,12 +1,9 @@
 import express, { Express } from "express";
 
 import bodyParser from "body-parser";
-import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
-import expressSession from "express-session";
 import indexRouter from "./routes/index.routes";
-import passport from "passport";
 
 dotenv.config();
 
@@ -19,28 +16,10 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 app.use(express.static("public"));
-app.use(cookieParser(process.env.COOKIE_SECRET as string));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(
-  expressSession({
-    secret: process.env.COOKIE_SECRET as string,
-    resave: true,
-    saveUninitialized: true,
-    cookie: { 
-      secure: false, 
-      httpOnly: false,
-      maxAge: 24 * 60 * 60 * 1000 
-    },
-  })
-);
-
-app.use(passport.initialize());
-app.use(passport.session());
-
-require("./config/passport")(passport);
+app.use(bodyParser.json({ limit: "10mb" }));
+app.use(bodyParser.urlencoded({limit: "10mb", extended: true, parameterLimit: 50000 }));
 
 app.use("/api", indexRouter);
 

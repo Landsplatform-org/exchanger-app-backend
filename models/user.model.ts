@@ -100,9 +100,9 @@ export class User {
     return new Promise((resolve, reject) => {
       this.find(id)
         .then(() => {
-          const sql = `UPDATE ea_users SET '${userBody}' WHERE id='${id}'`;
+          const sql = `UPDATE ea_users SET ? WHERE id=?`;
 
-          db.query(sql, (err: MysqlError | null, result: ResultSetHeader) => {
+          db.query(sql, [userBody, id], (err: MysqlError | null, result: ResultSetHeader) => {
             if (err) reject(err);
             resolve(result);
           });
@@ -161,7 +161,7 @@ export class User {
           const sql = `UPDATE ea_users SET token=NULL, is_verified=1 WHERE id='${id}'`;
 
           db.query(sql, () => {
-            resolve("Email was verified");
+            resolve("Почта была подтверждена!");
           });
         })
         .catch((error) => reject(error));
@@ -247,10 +247,22 @@ export class User {
 
           db.query(sql, (err: MysqlError | null) => {
             if (err) reject(err);
-            resolve("User avatar was updated successfully");
+            resolve(avatar);
           });
         })
         .catch((error) => reject(error));
+    });
+  }
+
+  tryLogIn(username: string): Promise<IUser> {
+    return new Promise((resolve, reject) => {
+      const sql = `SELECT * FROM ea_users WHERE username='${username}'`;
+
+      db.query(sql, (err: MysqlError | null, result: IUser[]) => {
+        if (err) reject(err);
+        if (!result[0]) reject("Неверное имя пользователя или пароль");
+        resolve(result[0]);
+      });
     });
   }
 

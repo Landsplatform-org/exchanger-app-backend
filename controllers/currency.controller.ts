@@ -10,7 +10,7 @@ export const getCurrencies = async (req: Request, res: Response) => {
   const limit = req.query.limit ? (req.query.limit as string) : "10";
 
   try {
-    const result = await currencies.getAll(limit, page);
+    const result = await currencies.getAllWithMerge(limit, page);
     return res.status(200).send({
       status: 200,
       data: result,
